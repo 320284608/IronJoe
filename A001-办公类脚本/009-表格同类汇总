@@ -1,0 +1,59 @@
+# ！/usr/bin/env python
+# @Time     :2021/2/26 20:27
+# @Author   :IronJoe
+# @Site     :
+# @File     :009-表格同类汇总.py
+# @Software :PyCharm
+
+import csv
+
+def csv_file_list(csv_file):
+    with open(csv_file, encoding='gbk') as fp:
+        name_list = []
+        f_csv = csv.reader(fp)
+        for i in f_csv:
+            name_list.append(i)
+    return name_list
+
+def csv_process(file_list,n1,n2,n3):
+    """
+    如果 n1和n2所在的位置数据相同，则把那所在的数据相加
+    :param file_list: 获取的列表，包含表头
+    :param n1: 第一个相同条件
+    :param n2: 第二个相同条件
+    :param n3: 数量
+    :return: 新列表
+    """
+
+    double_list = [] # 用于存放n1以及n2列的数据
+    whole_list = [] #存放新数据
+    for data in file_list: # 遍历列表数据
+        data1and4 = [data[n1],data[n2]] # 单独取出n1以及n2列数据
+        if data1and4 not in double_list:
+            double_list.append(data1and4)
+            whole_list.append(data)
+        else:
+            location = double_list.index(data1and4) # 索引从1开始，根据索引找出数据位置
+            whole_list[location][n3] = int(whole_list[location][n3]) + int(data[n3])
+
+    # 序号重排
+    for i,data in enumerate(whole_list):
+        if i>0:
+            data[0] = i
+
+    return whole_list
+def csv_write(file_list):
+    with open('./new.csv', 'w', newline='')as f:
+        write = csv.writer(f)
+        write.writerows(file_list)
+        print("写入完毕！")
+
+def main_process(csv_file):
+    csv_list = csv_file_list(csv_file)
+    new_list = csv_process(csv_list,1,4,6)
+    csv_write(new_list)
+
+
+if __name__ == '__main__':
+    csv_file = r'F:\001-程序学习\001-Python\000-学习\002-办公自动化\001_小的程序\MBRI-2003项目BX区域机器人底座V1_BOM - 复制.csv'
+    main_process(csv_file)
