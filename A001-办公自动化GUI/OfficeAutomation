@@ -18,6 +18,22 @@ from openpyxl import Workbook  # 用于写入数据，支持大型数据写入
 from tqdm import tqdm
 
 
+def make_file_path():
+    abs_path = os.getcwd()
+    path1 = 'A_office_file'
+    office_file_path = 'A_office_file/file'
+    last_path = os.path.join(abs_path, office_file_path)
+    if not os.path.exists(last_path):
+        if not os.path.isdir(last_path):
+            os.makedirs(last_path)
+            print('文件夹创建成功')
+
+    up_path = os.path.join(abs_path, path1)
+
+    return up_path, last_path
+
+make_path1, make_des_path = make_file_path()
+
 class FileProcessing:
     """
     根据提供的关键字进行文件查找
@@ -32,6 +48,8 @@ class FileProcessing:
 
         struct_time = time.localtime()  # 元组格式
         self.last_time = time.strftime('%Y-%m-%d', struct_time)  # 格式化时间
+
+        self.file_path = r'%s/目标文件列表-%s.txt' % (make_path1, self.last_time)
 
     @staticmethod
     def file_without_extension(folder_path1):
@@ -74,7 +92,12 @@ class FileProcessing:
         :param folder_path2:
         :return:
         """
-        file_list = glob.glob('%s/*' % folder_path2)
+        try:
+            file_list = [r"{}\{}".format(folder_path2,file) for file in os.listdir(folder_path2)]
+        except Exception as e:
+           return []
+
+        # file_list = glob.glob(r'{}/*'.format(folder_path2))
         need_file_list = []
         for i in file_list:
             if os.path.isdir(i):
@@ -86,6 +109,11 @@ class FileProcessing:
 
     @staticmethod
     def auto_save_file(file):
+        """
+        文件同名复制处理
+        :param file:
+        :return:
+        """
 
         directory, file_name = os.path.split(file)
         filename, extension = os.path.splitext(file)
@@ -104,33 +132,78 @@ class FileProcessing:
             file_new = os.path.join(directory + os.sep + file_name) + extension
             return file_new
 
-    def file_to_txt(self, list_file, path=None):
+    @staticmethod
+    def del_file(filepath):
+        """
+        删除某一目录下的所有文件或文件夹
+        :param filepath: 路径
+        :return:
+        """
+        del_list = os.listdir(filepath)
+        for f in del_list:
+            file_path = os.path.join(filepath, f)
+            if os.path.isfile(file_path):
+                os.remove(file_path)
+            elif os.path.isdir(file_path):
+                shutil.rmtree(file_path)
+
+    def file_to_txt(self, list_file):
         """
         如果最终返回的列表有内容，文件保存
-        :param path:
         :param list_file:
         :return:
         """
-        if not path:
-            file_path = r'目标文件列表-%s.txt' % self.last_time
-        else:
-            file_path = r'%s/目标文件列表-%s.txt' % (path, self.last_time)
         if len(list_file):
-            with open(file_path, 'a+', encoding='utf-8') as fh:
+            with open(self.file_path, 'a+', encoding='utf-8') as fh:
                 for i in list_file:
                     fh.write(i + '\n')
 
-    def data_clear(self, path=None):
+    def read_file(self):
+        """
+        读取生成的txt文件
+        rn:
+        """
+        # file_path = self.file_path
+        with open(self.file_path, 'r', encoding='UTF-8-sig') as fh:  # 去除\ufeff
+            filename_list = []
+            for i in fh:
+                filename_list.append(i.strip())
+        return filename_list
+
+    def corm(self, file, p_flag):
+        if p_flag == 'c':
+            shutil.copy2(file, make_des_path)
+        if p_flag == 'm':
+            shutil.move(file, make_des_path)
+
+    def file_corm(self, p_flag):
+        """
+        文件移动或复制
+        :param p_flag:
+        :return:
+        """
+        # 文件夹清洗
+
+        if self.read_file():
+            # self.del_file(make_des_path)
+
+            for file in self.read_file():
+                try:
+                    self.corm(file, p_flag)
+                except shutil.SameFileError:
+                    (path, file_name) = os.path.split(file)
+                    new_file = os.path.join(make_des_path, file_name)
+                    file_new_name = self.auto_save_file(new_file)
+                    self.corm(file_new_name, p_flag)
+
+    def data_clear(self):
 
         # 数据清洗
-
-        if not path:
-            file_path = r'目标文件列表-%s.txt' % self.last_time
-        else:
-            file_path = r'%s/目标文件列表-%s.txt' % (path, self.last_time)
-
-        with open(file_path, 'w', encoding='utf-8') as fh:
-            fh.write('')
+        try:
+            with open(self.file_path, 'w', encoding='utf-8') as fh:
+                fh.write('')
+        except:
+            pass
 
 
 class FileCompared(FileProcessing):
@@ -373,7 +446,7 @@ class FileCopy(FileExcelProcessing):
                 filename_list.append(i.strip())
         return filename_list
 
-    def single_file_copy(self, folder_path2, file_need_list):
+    def single_file_name_find(self, folder_path2, file_need_list):
 
         if self.file_extent == 'None':
             file_list = self.file_without_extension(folder_path2)
@@ -406,27 +479,53 @@ class FileCopy(FileExcelProcessing):
                     shutil.copy2(file, file_new_name)
                 file_find_list.append(file)
 
-        self.file_to_txt(file_find_list, self.destination_path)  # txt文件输出
+        self.file_to_txt(file_find_list)  # txt文件输出
+
+    # def copy_file(self, folder_path1, file_need_list):
+    #     """
+    #     利用递归
+    #     :param folder_path1:
+    #     :param file_need_list:
+    #     :return:
+    #     """
+    #     self.single_file_name_find(folder_path1, file_need_list)
+    #     try:
+    #         list_dir = os.listdir(folder_path1)  # 起始位置所有文件
+    #     except Exception:
+    #         list_dir=[]
+    #     for file_ in list_dir:
+    #         file_path = os.path.join(folder_path1, file_)
+    #         if os.path.isdir(file_path):
+    #             self.copy_file(file_path, file_need_list)
 
     def copy_file(self, folder_path1, file_need_list):
         """
-
+        利用循环
         :param folder_path1:
         :param file_need_list:
         :return:
         """
-        self.single_file_copy(folder_path1, file_need_list)
-        list_dir = os.listdir(folder_path1)  # 起始位置所有文件
-        for file_ in list_dir:
-            file_path = os.path.join(folder_path1, file_)
-            if os.path.isdir(file_path):
-                self.copy_file(file_path, file_need_list)
+        name_dir = [folder_path1]
+        while name_dir:
+            name_pop = name_dir.pop(0)
+            self.single_file_name_find(name_pop, file_need_list)
+            try:
+                name_list = [r"{}\{}".format(name_pop, file) for file in os.listdir(name_pop)]# 取出从大列表中删除的第一个路径
+            except Exception as e:
+                print(e)
+                continue
+
+            for file in name_list:
+                file_path = os.path.join(folder_path1, file)
+                if os.path.isdir(file_path):
+                    name_dir.append(file)
+
 
     def run(self):
 
         start_time = time.perf_counter()
 
-        self.data_clear(self.destination_path)
+        self.data_clear()
 
         file_need_list = self.get_need_list()
         print(file_need_list)
@@ -523,10 +622,15 @@ class FileSearch(FileExcelProcessing):
 
         start_time = time.perf_counter()
 
-        # 数据清洗
         self.data_clear()
+        self.del_file(make_des_path)
 
         self.find_file_content(self.origin_folder_path)  # 主程序运行
+
+        print('文件查找完成')
+
+        self.file_corm('c')
+
         ending_time = time.perf_counter()  # 程序运行时间
 
         print('\n')
@@ -585,12 +689,12 @@ class FilePDFProcessing(FileProcessing):
 """
 
 if __name__ == '__main__':
-    folder_path = r'F:\001-程序学习\001-Python'
-    des_path = r'F:\001-程序学习\001-Python\000-学习\002-办公自动化'
+    folder_path = 'E:\\'
+    des_path = r'F:\001-程序学习\001-Python\000-学习\002-办公自动化\打包\TEST'
     # folder_path = r'F:\001-程序学习\001-Python\004-项目测试\pdftest'
 
-    file_ref = r'F:\001-程序学习\001-Python\000-学习\002-办公自动化\目标文件列表-2020-11-.txt'
+    file_ref = r'F:\001-程序学习\001-Python\000-学习\002-办公自动化\打包\新建文本文档.txt'
 
-    test = FileSearch(folder_path, '块', 'a')
+    test = FileCopy(folder_path, des_path,file_ref, 'All')
     # test.MergePDF()
     test.run()
